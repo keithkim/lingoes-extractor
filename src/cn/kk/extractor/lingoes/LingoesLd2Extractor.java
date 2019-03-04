@@ -1,24 +1,24 @@
 package cn.kk.extractor.lingoes;
 
 /*  Copyright (c) 2010 Xiaoyun Zhu
- * 
- *  Permission is hereby granted, free of charge, to any person obtaining a copy  
- *  of this software and associated documentation files (the "Software"), to deal  
- *  in the Software without restriction, including without limitation the rights  
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
- *  copies of the Software, and to permit persons to whom the Software is  
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
- *  
- *  The above copyright notice and this permission notice shall be included in  
+ *
+ *  The above copyright notice and this permission notice shall be included in
  *  all copies or substantial portions of the Software.
- *  
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR  
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE  
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER  
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN  
- *  THE SOFTWARE.  
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ *  THE SOFTWARE.
  */
 
 import java.io.BufferedWriter;
@@ -44,7 +44,6 @@ import java.util.zip.InflaterInputStream;
 
 import cn.kk.extractor.lingoes.ArrayHelper.SensitiveStringDecoder;
 
-// https://skydrive.live.com/?cid=A10100D37ADC7AD3&sc=documents
 public class LingoesLd2Extractor {
     private boolean started = false;
     private long startedTime;
@@ -68,13 +67,15 @@ public class LingoesLd2Extractor {
         int counter = 0;
 
         // read lingoes ld2 into byte array
-        FileChannel fChannel = new RandomAccessFile(ld2File, "r").getChannel();
+        RandomAccessFile acf = new RandomAccessFile(ld2File, "r");
+        FileChannel fChannel = acf.getChannel();
         ByteBuffer dataRawBytes = null;
         try {
             dataRawBytes = ByteBuffer.allocate((int) fChannel.size());
             fChannel.read(dataRawBytes);
         } finally {
             fChannel.close();
+            acf.close();
         }
         if (dataRawBytes != null) {
             dataRawBytes.order(ByteOrder.LITTLE_ENDIAN);
@@ -86,20 +87,20 @@ public class LingoesLd2Extractor {
                 int offsetWithInfo = dataRawBytes.getInt(offsetData + 4) + offsetData + 12;
                 if (type == 3) {
                     counter = readDictionary(ld2File, outFile, dataRawBytes, offsetData);
-                } else if (dataRawBytes.limit() > (offsetWithInfo + 0x1C)) {
+                } else if (dataRawBytes.limit() > offsetWithInfo + 0x1C) {
                     counter = readDictionary(ld2File, outFile, dataRawBytes, offsetWithInfo);
                 } else {
-                    System.err.println("文件不包含字典数据。网上字典？");
+                    System.err.println("File does not contain dictionary data. Online dictionary?");
                 }
             } else {
-                System.err.println("文件不包含字典数据。网上字典？");
+                System.err.println("The file does not contain dictionary data. Online dictionary?");
             }
 
             this.main.setStatusDirect(counter, counter,
                     LingoesLd2Extractor.calcSpeed(counter, this.startedTime, System.currentTimeMillis()));
             return counter;
         } else {
-            throw new RuntimeException("文件不包含字典数据。网上字典？");
+            throw new RuntimeException("The file does not contain dictionary data. Online dictionary?");
         }
     }
 
@@ -114,7 +115,7 @@ public class LingoesLd2Extractor {
         List<Integer> deflateStreams = new ArrayList<Integer>();
         dataRawBytes.position(offsetCompressedDataHeader + 8);
         int offset = dataRawBytes.getInt();
-        while (this.started && ((offset + dataRawBytes.position()) < limit)) {
+        while (this.started && offset + dataRawBytes.position() < limit) {
             offset = dataRawBytes.getInt();
             deflateStreams.add(Integer.valueOf(offset));
         }
@@ -126,7 +127,7 @@ public class LingoesLd2Extractor {
     }
 
     private int extract(ByteBuffer inflatedBytes, int offsetDefs, int offsetXml, File outputFile) throws IOException,
-            FileNotFoundException, UnsupportedEncodingException {
+    FileNotFoundException, UnsupportedEncodingException {
 
         int counter = 0;
         BufferedWriter outputWriter = new BufferedWriter(new FileWriter(outputFile), Helper.BUFFER_SIZE);
@@ -134,7 +135,7 @@ public class LingoesLd2Extractor {
             inflatedBytes.order(ByteOrder.LITTLE_ENDIAN);
 
             final int dataLen = 10;
-            final int defTotal = (offsetDefs / dataLen) - 1;
+            final int defTotal = offsetDefs / dataLen - 1;
 
             this.main.setStatus(defTotal, 0, 0);
             int[] idxData = new int[6];
@@ -155,7 +156,7 @@ public class LingoesLd2Extractor {
                 if (defData[0].isEmpty() || defData[1].isEmpty()) {
                     failCounter++;
                 }
-                if (failCounter > (defTotal * 0.01)) {
+                if (failCounter > defTotal * 0.01) {
                     System.err.println("??");
                     System.err.println(defData[0] + " = " + defData[1]);
                 }
@@ -183,7 +184,7 @@ public class LingoesLd2Extractor {
     private static final int calcSpeed(int finished, long started, long now) {
         double timeDiff = now - started;
         if (timeDiff > 0) {
-            double speed = (finished * 1000.0) / timeDiff;
+            double speed = finished * 1000.0 / timeDiff;
             return (int) speed;
         } else {
             return 0;
@@ -194,14 +195,14 @@ public class LingoesLd2Extractor {
             final int offsetWords, final int offsetXml, final int defTotal, final int dataLen, final int[] idxData,
             final String[] defData) throws UnsupportedEncodingException {
         final int test = Math.min(defTotal, 500);
-        Pattern p = Pattern.compile("^.*[\\x00-\\x1f].*$");
+        Pattern.compile("^.*[\\x00-\\x1f].*$");
         for (SensitiveStringDecoder element : LingoesLd2Extractor.AVAIL_ENCODINGS) {
             for (SensitiveStringDecoder element2 : LingoesLd2Extractor.AVAIL_ENCODINGS) {
                 try {
                     readDefinitionData(inflatedBytes, offsetWords, offsetXml, dataLen, element, element2, idxData,
                             defData, test);
-                    System.out.println("词组编码：" + element.name);
-                    System.out.println("XML编码：" + element2.name);
+                    System.out.println("Cell Code:" + element.name);
+                    System.out.println("XML encoding:" + element2.name);
                     return new ArrayHelper.SensitiveStringDecoder[] {
                             element, element2
                     };
@@ -210,7 +211,7 @@ public class LingoesLd2Extractor {
                 }
             }
         }
-        System.err.println("自动识别编码失败！选择UTF-16LE继续。");
+        System.err.println("Automatic identification of the code failed! Select UTF-16LE to continue.");
         return new ArrayHelper.SensitiveStringDecoder[] {
                 LingoesLd2Extractor.AVAIL_ENCODINGS[1], LingoesLd2Extractor.AVAIL_ENCODINGS[1]
         };
@@ -228,7 +229,7 @@ public class LingoesLd2Extractor {
         int currenXmlOffset = wordIdxData[5];
         String xml = LingoesLd2Extractor.strip(new String(valueDecoder.decode(inflatedBytes.array(), offsetXml
                 + lastXmlPos, currenXmlOffset - lastXmlPos)));
-        while (this.started && (refs-- > 0)) {
+        while (this.started && refs-- > 0) {
             int ref = inflatedBytes.getInt(offsetWords + lastWordPos);
             LingoesLd2Extractor.getIdxData(inflatedBytes, dataLen * ref, wordIdxData);
             lastXmlPos = wordIdxData[1];
@@ -269,12 +270,12 @@ public class LingoesLd2Extractor {
             end = 0;
             open = xml.indexOf('<');
             do {
-                if ((open - end) > 1) {
+                if (open - end > 1) {
                     sb.append(xml.substring(end + 1, open));
                 }
                 open = xml.indexOf('<', open + 1);
                 end = xml.indexOf('>', end + 1);
-            } while ((open != -1) && (end != -1));
+            } while (open != -1 && end != -1);
             return sb.toString().replace('\t', ' ').replace(Helper.SEP_NEWLINE_CHAR, ' ').replace('\u001e', ' ')
                     .replace('\u001f', ' ');
         }
